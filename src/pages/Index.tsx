@@ -7,7 +7,7 @@ import GameRoom from "@/components/room/GameRoom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Wifi, WifiOff, RefreshCw } from "lucide-react";
 
 const Index = () => {
   const { username, setUsername, connectToServer, disconnectFromServer, currentRoom, isConnected } = useGame();
@@ -44,14 +44,17 @@ const Index = () => {
           setConnecting(false);
         });
     }
-  }, [isConnected, connectToServer, radixToast, connecting]);
+  }, []);
 
   const handleLogin = (username: string) => {
     setConnecting(true);
     setConnectionFailed(false);
     
+    console.log("Attempting to connect with username:", username);
+    
     connectToServer(username)
       .then((success) => {
+        console.log("Connection attempt result:", success);
         if (success) {
           radixToast({
             title: "Connected!",
@@ -63,7 +66,8 @@ const Index = () => {
           toast("Limited connectivity: Using offline mode. Some features may be restricted.");
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Connection error:", error);
         setConnectionFailed(true);
         toast("Unable to connect to game server. Using offline mode.");
       })
@@ -87,8 +91,11 @@ const Index = () => {
     setConnecting(true);
     setConnectionFailed(false);
     
+    console.log("Retrying connection with username:", username);
+    
     connectToServer(username)
       .then((success) => {
+        console.log("Reconnection attempt result:", success);
         if (success) {
           radixToast({
             title: "Connected!",
@@ -100,7 +107,8 @@ const Index = () => {
           toast("Still unable to connect. Using offline mode.");
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("Reconnection error:", error);
         setConnectionFailed(true);
         toast("Connection failed. Using offline mode.");
       })
@@ -141,7 +149,7 @@ const Index = () => {
             <div className="flex items-center">
               {connectionFailed ? (
                 <div className="flex items-center gap-2 text-amber-500">
-                  <AlertCircle size={16} />
+                  <WifiOff size={16} />
                   <span className="text-xs">Offline Mode</span>
                   <Button 
                     variant="outline" 
@@ -153,13 +161,13 @@ const Index = () => {
                     {connecting ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
-                      "Retry"
+                      <><RefreshCw size={12} className="mr-1" /> Retry</>
                     )}
                   </Button>
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <Wifi size={16} className="text-green-500" />
                   <span className="text-xs text-green-600">Connected</span>
                 </div>
               )}
