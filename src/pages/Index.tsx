@@ -7,6 +7,7 @@ import GameRoom from "@/components/room/GameRoom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 const Index = () => {
   const { username, setUsername, connectToServer, disconnectFromServer, currentRoom, isConnected } = useGame();
@@ -16,28 +17,34 @@ const Index = () => {
 
   // Attempt to connect with stored username on load
   useEffect(() => {
-    if (username && !isConnected) {
+    const storedUsername = localStorage.getItem("tictactoe_username");
+    
+    if (storedUsername && !isConnected && !connecting) {
       setConnecting(true);
       setConnectionFailed(false);
       
-      connectToServer(username)
+      connectToServer(storedUsername)
         .then((success) => {
           if (success) {
             radixToast({
               title: "Connected!",
-              description: `Welcome back, ${username}!`,
+              description: `Welcome back, ${storedUsername}!`,
             });
+            setConnectionFailed(false);
+          } else {
+            setConnectionFailed(true);
+            toast("Limited connectivity: Using offline mode. Some features may be restricted.");
           }
         })
         .catch(() => {
           setConnectionFailed(true);
-          toast("Unable to connect to game server. Some features may be limited.");
+          toast("Unable to connect to game server. Using offline mode.");
         })
         .finally(() => {
           setConnecting(false);
         });
     }
-  }, [username, isConnected, connectToServer, radixToast]);
+  }, [isConnected, connectToServer, radixToast, connecting]);
 
   const handleLogin = (username: string) => {
     setConnecting(true);
@@ -50,11 +57,15 @@ const Index = () => {
             title: "Connected!",
             description: `Welcome, ${username}!`,
           });
+          setConnectionFailed(false);
+        } else {
+          setConnectionFailed(true);
+          toast("Limited connectivity: Using offline mode. Some features may be restricted.");
         }
       })
       .catch(() => {
         setConnectionFailed(true);
-        toast("Unable to connect to game server. Some features may be limited.");
+        toast("Unable to connect to game server. Using offline mode.");
       })
       .finally(() => {
         setConnecting(false);
@@ -70,23 +81,46 @@ const Index = () => {
     });
   };
 
-  // Show the login form if not connected
-  if (!username || !isConnected) {
+  const handleRetryConnection = () => {
+    if (!username) return;
+    
+    setConnecting(true);
+    setConnectionFailed(false);
+    
+    connectToServer(username)
+      .then((success) => {
+        if (success) {
+          radixToast({
+            title: "Connected!",
+            description: "Successfully reconnected to the server.",
+          });
+          setConnectionFailed(false);
+        } else {
+          setConnectionFailed(true);
+          toast("Still unable to connect. Using offline mode.");
+        }
+      })
+      .catch(() => {
+        setConnectionFailed(true);
+        toast("Connection failed. Using offline mode.");
+      })
+      .finally(() => {
+        setConnecting(false);
+      });
+  };
+
+  // Show the login form if not logged in
+  if (!username) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-game-secondary/30 p-4">
         <div className="w-full max-w-md">
           <h1 className="text-4xl font-bold text-center mb-2 text-game-primary">Tic-Tac-Toe</h1>
           <p className="text-center mb-8 text-muted-foreground">Multiplayer online game</p>
           
-          {connectionFailed && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4 text-yellow-800 text-sm">
-              Note: Could not connect to game server. You can still play in local mode.
-            </div>
-          )}
-          
           {connecting ? (
-            <div className="flex justify-center">
-              <div className="animate-spin h-8 w-8 border-4 border-game-primary border-t-transparent rounded-full"></div>
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-game-primary" />
+              <p>Connecting to server...</p>
             </div>
           ) : (
             <UsernameForm onSubmit={handleLogin} />
@@ -104,6 +138,32 @@ const Index = () => {
             <h1 className="text-xl font-bold text-game-primary">Tic-Tac-Toe</h1>
           </div>
           <div className="flex items-center gap-4">
+            <div className="flex items-center">
+              {connectionFailed ? (
+                <div className="flex items-center gap-2 text-amber-500">
+                  <AlertCircle size={16} />
+                  <span className="text-xs">Offline Mode</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRetryConnection}
+                    disabled={connecting}
+                    className="ml-2 text-xs h-7 px-2"
+                  >
+                    {connecting ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      "Retry"
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <span className="text-xs text-green-600">Connected</span>
+                </div>
+              )}
+            </div>
             <div className="text-sm">Logged in as <span className="font-semibold">{username}</span></div>
             <Button 
               variant="outline" 
@@ -116,6 +176,17 @@ const Index = () => {
           </div>
         </div>
       </header>
+
+      {connectionFailed && (
+        <div className="bg-amber-50 border border-amber-200 mx-auto max-w-3xl mt-4 p-3 rounded-md flex items-start gap-3">
+          <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={18} />
+          <div>
+            <p className="text-sm text-amber-800">
+              Limited connectivity mode: You can still play locally, but multiplayer features may be limited.
+            </p>
+          </div>
+        </div>
+      )}
 
       <main className="container mx-auto px-4 py-8">
         {currentRoom ? <GameRoom /> : <RoomList />}

@@ -1,11 +1,11 @@
+
 import { io, Socket } from "socket.io-client";
 import { toast } from "@/hooks/use-toast";
 
-// Updated server URL - using render.com which is more reliable
-// Note: This is a demo server and might still have limitations
-const SOCKET_URL = "https://tictactoe-socket-server.onrender.com"; 
-// Fallback to local development if needed
-const FALLBACK_URL = "http://localhost:3001";
+// Use a more reliable WebSocket server for the game
+const SOCKET_URL = "https://tic-tac-toe-server-production.up.railway.app";
+// Fallback for development or if main server is down
+const FALLBACK_URL = "https://tictactoe-socket-server.onrender.com";
 
 export interface GameState {
   board: Array<string | null>;
@@ -38,10 +38,11 @@ class SocketService {
   private socket: Socket | null = null;
   private username: string | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 3;
+  private maxReconnectAttempts = 5;
 
   connect(username: string) {
     this.username = username;
+    localStorage.setItem("tictactoe_username", username);
     
     if (this.socket && this.socket.connected) {
       return Promise.resolve(true);
@@ -55,27 +56,44 @@ class SocketService {
           transports: ["websocket", "polling"], // Add polling as fallback
           autoConnect: true,
           reconnectionAttempts: this.maxReconnectAttempts,
-          timeout: 10000 // 10 second timeout
+          timeout: 8000, // 8 second timeout
+          reconnectionDelay: 1000,
         });
+
+        const connectTimeout = setTimeout(() => {
+          if (this.socket && !this.socket.connected) {
+            // Try fallback server if main fails
+            console.log("Main server connection timeout, trying fallback...");
+            this.socket.disconnect();
+            this.connectToFallback(username, resolve, reject);
+          }
+        }, 5000);
 
         this.socket.on("connect", () => {
           console.log("Connected to socket server");
+          clearTimeout(connectTimeout);
           this.reconnectAttempts = 0;
           resolve(true);
         });
 
         this.socket.on("connect_error", (error) => {
           console.error("Connection error:", error);
-          this.handleConnectionError(error, username, resolve, reject);
+          clearTimeout(connectTimeout);
+          if (this.reconnectAttempts === 0) {
+            this.connectToFallback(username, resolve, reject);
+          } else {
+            // Handle as graceful degradation
+            console.log("Using offline mode");
+            resolve(false); // Resolve but indicate connection failed
+          }
+        });
+
+        this.socket.on("disconnect", () => {
+          console.log("Disconnected from server");
         });
 
         this.socket.on("error", (error) => {
           console.error("Socket error:", error);
-          toast({
-            title: "Server error",
-            description: error.message || "Something went wrong with the game server",
-            variant: "destructive",
-          });
         });
       } catch (error) {
         console.error("Socket initialization error:", error);
@@ -84,23 +102,34 @@ class SocketService {
     });
   }
 
-  // Handle connection errors with potential fallback
-  private handleConnectionError(error: any, username: string, resolve: (value: boolean) => void, reject: (reason?: any) => void) {
+  private connectToFallback(username: string, resolve: (value: boolean) => void, reject: (reason?: any) => void) {
     this.reconnectAttempts++;
+    console.log(`Attempting fallback connection (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
-    // Show notification to user
-    toast({
-      title: "Connection issue",
-      description: "Having trouble connecting to game server. Using offline mode.",
-      variant: "destructive",
-    });
-
-    // For this demo, we'll just resolve with a "fake" connection
-    // In a real app, you might try the fallback server or implement offline mode
-    setTimeout(() => {
-      // Simulate successful connection for demo purposes
-      resolve(true);
-    }, 1000);
+    try {
+      this.socket = io(FALLBACK_URL, {
+        query: { username },
+        transports: ["websocket", "polling"],
+        autoConnect: true,
+        timeout: 8000,
+      });
+      
+      this.socket.on("connect", () => {
+        console.log("Connected to fallback server");
+        this.reconnectAttempts = 0;
+        resolve(true);
+      });
+      
+      this.socket.on("connect_error", (error) => {
+        console.error("Fallback connection error:", error);
+        // All connection attempts failed
+        // Resolve anyway to allow offline/demo mode
+        resolve(false);
+      });
+    } catch (error) {
+      console.error("Fallback connection failed:", error);
+      resolve(false); // Allow app to continue in offline mode
+    }
   }
 
   disconnect() {
