@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -97,5 +98,53 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
   }
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 10px;
+  aspect-ratio: 1/1;
+}
+
+.board-cell {
+  aspect-ratio: 1/1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.board-cell:hover {
+  transform: scale(1.05);
+}
+
+.x-marker {
+  color: #6D28D9;
+  animation: bounce-in 0.4s;
+}
+
+.o-marker {
+  color: #F59E0B;
+  animation: bounce-in 0.4s;
+}
+
+.winning-cell {
+  background-color: rgba(109, 40, 217, 0.2);
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(5deg); }
+  75% { transform: rotate(-5deg); }
+}
+
+.wiggle {
+  animation: wiggle 0.5s ease-in-out;
 }
