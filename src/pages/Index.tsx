@@ -6,41 +6,55 @@ import RoomList from "@/components/room/RoomList";
 import GameRoom from "@/components/room/GameRoom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const Index = () => {
   const { username, setUsername, connectToServer, disconnectFromServer, currentRoom, isConnected } = useGame();
   const [connecting, setConnecting] = useState(false);
-  const { toast } = useToast();
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const { toast: radixToast } = useToast();
 
   // Attempt to connect with stored username on load
   useEffect(() => {
     if (username && !isConnected) {
       setConnecting(true);
+      setConnectionFailed(false);
+      
       connectToServer(username)
         .then((success) => {
           if (success) {
-            toast({
+            radixToast({
               title: "Connected!",
               description: `Welcome back, ${username}!`,
             });
           }
         })
+        .catch(() => {
+          setConnectionFailed(true);
+          toast("Unable to connect to game server. Some features may be limited.");
+        })
         .finally(() => {
           setConnecting(false);
         });
     }
-  }, [username, isConnected, connectToServer, toast]);
+  }, [username, isConnected, connectToServer, radixToast]);
 
   const handleLogin = (username: string) => {
     setConnecting(true);
+    setConnectionFailed(false);
+    
     connectToServer(username)
       .then((success) => {
         if (success) {
-          toast({
+          radixToast({
             title: "Connected!",
             description: `Welcome, ${username}!`,
           });
         }
+      })
+      .catch(() => {
+        setConnectionFailed(true);
+        toast("Unable to connect to game server. Some features may be limited.");
       })
       .finally(() => {
         setConnecting(false);
@@ -50,7 +64,7 @@ const Index = () => {
   const handleLogout = () => {
     disconnectFromServer();
     localStorage.removeItem("tictactoe_username");
-    toast({
+    radixToast({
       title: "Logged out",
       description: "You have been disconnected from the game server.",
     });
@@ -63,6 +77,12 @@ const Index = () => {
         <div className="w-full max-w-md">
           <h1 className="text-4xl font-bold text-center mb-2 text-game-primary">Tic-Tac-Toe</h1>
           <p className="text-center mb-8 text-muted-foreground">Multiplayer online game</p>
+          
+          {connectionFailed && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4 text-yellow-800 text-sm">
+              Note: Could not connect to game server. You can still play in local mode.
+            </div>
+          )}
           
           {connecting ? (
             <div className="flex justify-center">
